@@ -1,0 +1,2 @@
+model_checkpoint_path: "/home/chaos/wjht/tensorflow/lstm_label/model_path/model"
+all_model_checkpoint_paths: "/home/chaos/wjht/tensorflow/lstm_label/model_path/model"
