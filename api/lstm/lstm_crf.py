@@ -19,7 +19,18 @@ class LstmCrf(object):
 
     def __init__(self, num_chars, num_classes, num_steps=200, num_epochs=100, embedding_matrix=None, is_training=True,
                  is_crf=True, weight=False):
-        # Parameter
+        """
+        函数说明: 类初始化
+        :param num_chars: 字符个数
+        :param num_classes: 标签个数
+        :param num_steps: 句子步长, 默认200
+        :param num_epochs: 迭代次数, 默认100
+        :param embedding_matrix: 词向量
+        :param is_training: 是否训练
+        :param is_crf: crf分词
+        :param weight:
+        """
+        # 参数
         self.max_f1 = 0
         self.learning_rate = 0.002
         self.dropout_rate = 0.5
@@ -32,13 +43,13 @@ class LstmCrf(object):
         self.num_chars = num_chars
         self.num_classes = num_classes
 
-        # placeholder of x, y and weight
-        self.inputs = tf.placeholder(tf.int32, [None, self.num_steps])            # 句子长度
-        self.targets = tf.placeholder(tf.int32, [None, self.num_steps])           # 标签长度
+        # 占位符
+        self.inputs = tf.placeholder(tf.int32, [None, self.num_steps])  # 句子长度
+        self.targets = tf.placeholder(tf.int32, [None, self.num_steps])  # 标签长度
         self.targets_weight = tf.placeholder(tf.float32, [None, self.num_steps])  # 权值
         self.targets_transition = tf.placeholder(tf.int32, [None])
 
-        # char embedding
+        # 词嵌入
         if embedding_matrix:
             self.embedding = tf.Variable(embedding_matrix, trainable=False, name="emb", dtype=tf.float32)
         else:
@@ -48,11 +59,11 @@ class LstmCrf(object):
         self.inputs_emb = tf.reshape(self.inputs_emb, [-1, self.emb_dim])
         self.inputs_emb = tf.split(0, self.num_steps, self.inputs_emb)
 
-        # lstm cell
+        # lstm 神经元,隐藏层100
         lstm_cell_fw = tf.nn.rnn_cell.BasicLSTMCell(self.hidden_dim)
         lstm_cell_bw = tf.nn.rnn_cell.BasicLSTMCell(self.hidden_dim)
 
-        # dropout
+        # dropout 避免过拟合
         if is_training:
             lstm_cell_fw = tf.nn.rnn_cell.DropoutWrapper(lstm_cell_fw, output_keep_prob=(1 - self.dropout_rate))
             lstm_cell_bw = tf.nn.rnn_cell.DropoutWrapper(lstm_cell_bw, output_keep_prob=(1 - self.dropout_rate))
@@ -123,6 +134,12 @@ class LstmCrf(object):
 
     @staticmethod
     def log_sum_exp(x, axis=None):
+        """
+        函数说明: log
+        :param x:
+        :param axis:
+        :return:
+        """
         x_max = tf.reduce_max(x, reduction_indices=axis, keep_dims=True)
         x_max_ = tf.reduce_max(x, reduction_indices=axis)
         return x_max_ + tf.log(tf.reduce_sum(tf.exp(x - x_max), reduction_indices=axis))
@@ -197,54 +214,48 @@ class LstmCrf(object):
                                                     float)
                 transition_batch = helper.get_transition(y_train_batch)
 
-                _, loss_train, max_scores, max_scores_pre, length, train_summary = \
-                    sess.run([self.optimizer,
-                              self.loss,
-                              self.max_scores,
-                              self.max_scores_pre,
-                              self.length,
-                              self.train_summary],
+                data = [self.optimizer, self.loss, self.max_scores, self.max_scores_pre, self.length,
+                        self.train_summary]
+                feed_dict = {self.targets_transition: transition_batch, self.inputs: x_train_batch,
+                             self.targets: y_train_batch, self.targets_weight: y_train_weight_batch}
 
-                             feed_dict={self.targets_transition: transition_batch,
-                                        self.inputs: x_train_batch,
-                                        self.targets: y_train_batch,
-                                        self.targets_weight: y_train_weight_batch})
+                _, loss_train, max_scores, max_scores_pre, length, train_summary = sess.run(data, feed_dict=feed_dict)
 
                 predicts_train = self.viterbi(max_scores, max_scores_pre, length, predict_size=self.batch_size)
 
                 # 训练集
-                if iteration % 5 == 0:
+                if iteration % 10 == 0:
                     cnt += 1
                     precision_train, recall_train, f1_train = self.evaluate(x_train_batch, y_train_batch,
                                                                             predicts_train, id_char, id_label)
                     summary_writer_train.add_summary(train_summary, cnt)
-                    print("训练集::\t循环: %d, loss: %3d, 准确率: %.3f, 召回率: %.3f, 精度: %.3f"
+                    print("训练集::\t循环: %3d, loss: %3d, 准确率: %.3f, 召回率: %.3f, f1: %.3f"
                           % (iteration, loss_train, precision_train, recall_train, f1_train))
 
                 # 验证集
-                if iteration % 5 == 0:
+                if iteration % 10 == 0:
                     x_val_batch, y_val_batch = helper.next_random_batch(x_val, y_val, batch_size=self.batch_size)
                     y_val_weight_batch = 1 + np.array((y_val_batch == label_id['B']) | (y_val_batch == label_id['E']),
                                                       float)
                     transition_batch = helper.get_transition(y_val_batch)
 
-                    loss_val, max_scores, max_scores_pre, length, val_summary = \
-                        sess.run([self.loss, self.max_scores, self.max_scores_pre, self.length, self.val_summary],
-                                 feed_dict={self.targets_transition: transition_batch, self.inputs: x_val_batch,
-                                            self.targets: y_val_batch, self.targets_weight: y_val_weight_batch})
+                    data = [self.loss, self.max_scores, self.max_scores_pre, self.length, self.val_summary]
+                    feed_dict = {self.targets_transition: transition_batch, self.inputs: x_val_batch,
+                                 self.targets: y_val_batch, self.targets_weight: y_val_weight_batch}
+                    loss_val, max_scores, max_scores_pre, length, val_summary = sess.run(data, feed_dict=feed_dict)
 
                     predicts_val = self.viterbi(max_scores, max_scores_pre, length, predict_size=self.batch_size)
                     precision_val, recall_val, f1_val = self.evaluate(x_val_batch, y_val_batch, predicts_val, id_char,
                                                                       id_label)
                     summary_writer_val.add_summary(val_summary, cnt)
-                    print("验证集::\t循环: %3d, loss: %3d, 准确率: %.3f, 召回率: %.3f, 精度: %.3f"
+                    print("验证集::\t循环: %3d, loss: %3d, 准确率: %.3f, 召回率: %.3f, f1: %.3f"
                           % (iteration, loss_val, precision_val, recall_val, f1_val))
 
                     if f1_val >= self.max_f1:
-                        print("\n-------------\n*保存模型.....")
+                        print("\n---------------\n*保存模型.....")
                         self.max_f1 = f1_val
                         saver.save(sess, save_file)
-                        print("*精度: %.4f\n-------------\n" % self.max_f1)
+                        print("*f1: %.4f\n---------------\n" % self.max_f1)
 
     def test(self, sess, test_data, output_path):
         """
@@ -308,8 +319,8 @@ class LstmCrf(object):
             if x == 'x' * self.num_steps:
                 continue
             y_pre = ''.join([id_label[str(val)] for val in predicts[i] if val != 5 and val != 0])
-            entity = '*&*'.join(helper.extract_entity(x, y_pre))
-            results.append('<@>'.join([x, y_pre, entity]))
+            entity = '_'.join(helper.extract_entity(x, y_pre))
+            results.append('<@>'.join([x, entity]))
         return results
 
     @staticmethod

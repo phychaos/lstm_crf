@@ -20,7 +20,7 @@ def train():
     """
     start = datetime.now()
     print('开始训练模型:', start, '\n')
-    train_data = helper.get_train(train_path=train_path, val_path=val_path, seq_max_len=num_steps)
+    train_data = helper.get_train(train_path=train_path, seq_max_len=num_steps)
     num_chars, num_labels = train_data['number']
 
     embedding_matrix = helper.get_embedding(emb_path) if emb_path else None

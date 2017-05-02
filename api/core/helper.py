@@ -39,7 +39,7 @@ def extract_entity(sentence, labels):
     :return:
     """
     entitys = []
-    pattern = re.compile(r'B*I*E')
+    pattern = re.compile(r'B*M*E|S')
     for kk in pattern.finditer(labels):
         start, end = kk.span()
         entity = sentence[start: end]
@@ -223,11 +223,10 @@ def build_map(train_path):
     return char_id, id_char, label_id, id_label
 
 
-def get_train(train_path, val_path, train_val_ratio=0.9, seq_max_len=200):
+def get_train(train_path, train_val_ratio=0.9, seq_max_len=200):
     """
     函数说明: 获取训练数据
     :param train_path: 训练数据路径
-    :param val_path: 验证数据路径
     :param train_val_ratio: 训练集,验证集比例
     :param seq_max_len: 序列长度
     :return:
@@ -250,16 +249,12 @@ def get_train(train_path, val_path, train_val_ratio=0.9, seq_max_len=200):
     y = y[index]
 
     # 训练数据集和验证数据集
-    if val_path:
-        x_train = x
-        y_train = y
-        x_val, y_val = get_test(test_path=val_path, is_validation=True, seq_max_len=seq_max_len)['test']
-    else:
-        val_num = int(num_samples * train_val_ratio)
-        x_train = x[:val_num]
-        y_train = y[:val_num]
-        x_val = x[val_num:]
-        y_val = y[val_num:]
+
+    val_num = int(num_samples * train_val_ratio)
+    x_train = x[:val_num]
+    y_train = y[:val_num]
+    x_val = x[val_num:]
+    y_val = y[val_num:]
 
     print("训练集大小:", len(x_train), "验证集大小:", len(y_val))
     num_chars = len(id_char)
@@ -269,11 +264,10 @@ def get_train(train_path, val_path, train_val_ratio=0.9, seq_max_len=200):
     return data
 
 
-def get_test(test_path, is_validation=False, seq_max_len=200, token_path='token/'):
+def get_test(test_path, seq_max_len=200, token_path='token/'):
     """
     函数说明: 获取测试数据
     :param test_path: 测试数据路径
-    :param is_validation:
     :param seq_max_len:
     :param token_path:
     :return:
@@ -281,32 +275,34 @@ def get_test(test_path, is_validation=False, seq_max_len=200, token_path='token/
     char_id, id_char = load_map(token_path + "char_id")
     label_id, id_label = load_map(token_path + "label_id")
 
-    df_test = pd.read_csv(test_path, delimiter='\t', skip_blank_lines=False, header=None, names=["char", "label"])
-
-    def map_func(x, chars_id):
-        if str(x) == str(np.nan):
-            return -1
-        return chars_id[x] if char_id.get(x) else chars_id["<NEW>"]
+    def map_func(chars):
+        char_list = []
+        id_list = []
+        for x in chars:
+            char_list.append(x)
+            new_id = char_id['<NEW>']
+            id_list.append(char_id.get(x, new_id))
+        char_list.append(-1)
+        id_list.append(-1)
+        return char_list, id_list
 
     # 字符标签转换为数字
-    df_test["char_id"] = df_test.char.map(lambda x: map_func(x, char_id))
-    df_test["label_id"] = df_test.label.map(lambda x: -1 if str(x) == str(np.nan) else label_id[x])
+    test_char = []
+    test_id = []
+    with open(test_path, 'r') as fp:
+        for line in fp.readlines():
+            char_, id_ = map_func(line.strip())
+            test_char.extend(char_)
+            test_id.extend(id_)
 
     # 数字数组化200一句,不足200补0
-    x_test, y_test = prepare(df_test["char_id"], df_test["label_id"], seq_max_len)
-    x_test_str, _ = prepare(df_test["char"], df_test["char_id"], seq_max_len, is_padding=False)
-
+    x_test_str, x_test = prepare(test_char, test_id, seq_max_len, is_padding=False)
     print("测试数据大小", len(x_test))
     num_chars = len(id_char)
     num_labels = len(id_label)
-    if is_validation:
-        data = {'test': [x_test, y_test], 'token': [char_id, id_char, label_id, id_label],
-                'number': [num_chars, num_labels]}
-        return data
-    else:
-        data = {'test': [x_test, x_test_str], 'token': [char_id, id_char, label_id, id_label],
-                'number': [num_chars, num_labels]}
-        return data
+    data = {'test': [x_test, x_test_str], 'token': [char_id, id_char, label_id, id_label],
+            'number': [num_chars, num_labels]}
+    return data
 
 
 def get_transition(y_batch):

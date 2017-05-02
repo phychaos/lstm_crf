@@ -11,7 +11,7 @@ import os
 path = os.getcwd()
 # train
 
-train_path = os.path.join(path, 'data/data.data')
+train_path = os.path.join(path, 'data/199801人民日报.data')
 test_path = os.path.join(path, 'data/test.data')
 model_path = os.path.join(path, 'model_path/model')
 output_path = os.path.join(path, 'output/output.data')
