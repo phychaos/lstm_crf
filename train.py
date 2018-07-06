@@ -7,4 +7,5 @@
     @time: 17-4-17.下午3:54
 """
 from api.lstm.lstm_api import train
+
 train()

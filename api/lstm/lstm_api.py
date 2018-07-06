@@ -35,7 +35,7 @@ def train():
             with tf.variable_scope("model", reuse=None, initializer=initializer):
                 model = LstmCrf(**kwarg)
                 tf.global_variables_initializer().run()
-                print('\n正在训练模型...')
+
                 model.train(sess, model_path, train_data)
 
                 print('正确率: ', model.max_f1)

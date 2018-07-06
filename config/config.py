@@ -11,9 +11,9 @@ import os
 path = os.getcwd()
 # train
 
-train_path = os.path.join(path, 'data/199801人民日报.data')
+train_path = os.path.join(path, 'data/model_301_drug_split')
 test_path = os.path.join(path, 'data/test.data')
-model_path = os.path.join(path, 'model_path/model')
+model_path = 'model_path/'
 output_path = os.path.join(path, 'output/output.data')
 val_path = None
 emb_path = None
